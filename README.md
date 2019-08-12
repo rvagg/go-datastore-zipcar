@@ -4,6 +4,8 @@ An implementation of a [Datastore](https://github.com/ipfs/go-datastore) for [IP
 
 Documentation available at https://godoc.org/github.com/rvagg/go-ds-zipcar
 
+A JavaScript implementation is also available at [js-ds-zipcar](https://github.com/rvagg/js-ds-zipcar).
+
 ```go
 var ds *zipcar.ZipDatastore
 var node *dag.RawNode = dag.NewRawNode([]byte("random meaningless bytes"))
