@@ -10,6 +10,7 @@ import (
 	format "github.com/ipfs/go-ipld-format"
 	dag "github.com/ipfs/go-merkledag"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/assert"
 )
 
 // similar to tests in https://github.com/ipfs/go-car/blob/master/car_test.go
@@ -32,9 +33,9 @@ var cnd2 *cbor.Node
 var cnd3 *cbor.Node
 
 type cborTest struct {
-	Str string
-	I   int
-	B   bool
+	S string
+	I int
+	B bool
 }
 
 func TestSetup(t *testing.T) {
@@ -49,17 +50,11 @@ func TestSetup(t *testing.T) {
 	cbor.RegisterCborType(cborTest{})
 
 	cnd1, err = cbor.WrapObject(cborTest{"foo", 100, false}, mh.SHA2_256, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	cnd2, err = cbor.WrapObject(cborTest{"bar", -100, false}, mh.SHA2_256, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	cnd3, err = cbor.WrapObject(cborTest{"baz", 0, true}, mh.SHA2_256, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	os.Remove("test.zcar")
 }
@@ -69,40 +64,28 @@ func TestBuildNew(t *testing.T) {
 	var err error
 
 	ds, err = NewDatastore("test.zcar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	defer func() {
 		err = ds.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}()
 
 	for _, raw := range []*dag.RawNode{rnd1, rnd2, rnd3} {
 		err = ds.PutCid(raw.Cid(), raw.RawData())
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}
 
 	for _, nd := range []*dag.ProtoNode{pnd1, pnd2, pnd3} {
 		buf, err := nd.Marshal()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		err = ds.PutCid(nd.Cid(), buf)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}
 
 	for _, nd := range []*cbor.Node{cnd1, cnd2, cnd3} {
 		err = ds.PutCid(nd.Cid(), nd.RawData())
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}
 
 	// we are verifying from cache in this case
@@ -118,15 +101,11 @@ func TestReadExisting(t *testing.T) {
 	var err error
 
 	ds, err = NewDatastore("test.zcar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	defer func() {
 		err = ds.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}()
 
 	verifyHasEntries(t, ds, false)
@@ -141,15 +120,11 @@ func TestModifyExisting(t *testing.T) {
 	var err error
 
 	ds, err = NewDatastore("test.zcar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	defer func() {
 		err = ds.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}()
 
 	verifyHasEntries(t, ds, false)
@@ -158,21 +133,13 @@ func TestModifyExisting(t *testing.T) {
 	verifyCborNodes(t, ds, false)
 
 	err = ds.PutCid(rndz.Cid(), rndz.RawData())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	err = ds.DeleteCid(rnd2.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	err = ds.DeleteCid(pnd2.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	err = ds.DeleteCid(cnd2.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	verifyHasEntries(t, ds, true)
 	verifyRawNodes(t, ds, true)
@@ -188,15 +155,11 @@ func TestReadModified(t *testing.T) {
 	var err error
 
 	ds, err = NewDatastore("test.zcar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	defer func() {
 		err = ds.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	}()
 
 	verifyHasEntries(t, ds, true)
@@ -204,6 +167,25 @@ func TestReadModified(t *testing.T) {
 	verifyProtoNodes(t, ds, true)
 	verifyCborNodes(t, ds, true)
 	verifyHas(t, ds, rnd1.Cid(), "rnd1")
+}
+
+func TestReadJS(t *testing.T) {
+	// in this case we are loading a file created from JavaScript with the same data
+	var ds *ZipDatastore
+	var err error
+
+	ds, err = NewDatastore("js.zcar")
+	assert.NoError(t, err)
+
+	defer func() {
+		err = ds.Close()
+		assert.NoError(t, err)
+	}()
+
+	verifyHasEntries(t, ds, false)
+	verifyRawNodes(t, ds, false)
+	verifyProtoNodes(t, ds, false)
+	verifyCborNodes(t, ds, false)
 }
 
 func TestTeardown(t *testing.T) {
@@ -215,12 +197,8 @@ func verifyHas(t *testing.T, ds *ZipDatastore, cid cid.Cid, name string) {
 	var err error
 
 	has, err = ds.HasCid(cid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !has {
-		t.Fatalf("%s not found in datastore", name)
-	}
+	assert.NoError(t, err)
+	assert.Truef(t, has, "%s not found in datastore", name)
 }
 
 func verifyHasEntries(t *testing.T, ds *ZipDatastore, modified bool) {
@@ -229,12 +207,8 @@ func verifyHasEntries(t *testing.T, ds *ZipDatastore, modified bool) {
 		var err error
 
 		has, err = ds.HasCid(cid)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if has {
-			t.Fatalf("%s found in datastore, wut?", name)
-		}
+		assert.NoError(t, err)
+		assert.Falsef(t, has, "%s found in datastore, wut?", name)
 	}
 
 	if modified {
@@ -263,17 +237,13 @@ func verifyRawNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 			continue
 		}
 		data, err := ds.GetCid(raw.Cid())
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		if bytes.Compare(data, raw.RawData()) != 0 {
 			t.Errorf("data [%s] != original [%s]", data, raw.RawData())
 		}
 
 		size, err := ds.GetSizeCid(raw.Cid())
-		if size != 4 {
-			t.Fatal("Unexpected size of raw node's block")
-		}
+		assert.Equal(t, 4, size, "Unexpected size of raw node's block")
 	}
 }
 
@@ -285,18 +255,12 @@ func verifyProtoNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 
 	// pnd1
 	data, err = ds.GetCid(pnd1.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	node, err = dag.DecodeProtobuf(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	link, err = node.GetNodeLink("cat")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	if link.Cid != rnd1.Cid() {
 		t.Errorf("Incorrect link in ProtoNode pnd1 / cat")
 	}
@@ -304,25 +268,17 @@ func verifyProtoNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 	// pnd2
 	if !modified {
 		data, err = ds.GetCid(pnd2.Cid())
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		node, err = dag.DecodeProtobuf(data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		link, err = node.GetNodeLink("dog")
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		if link.Cid != rnd2.Cid() {
 			t.Errorf("Incorrect link in ProtoNode pnd2 / dog")
 		}
 		link, err = node.GetNodeLink("first")
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		if link.Cid != pnd1.Cid() {
 			t.Errorf("Incorrect link in ProtoNode pnd2 / first")
 		}
@@ -330,26 +286,18 @@ func verifyProtoNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 
 	// pnd3
 	data, err = ds.GetCid(pnd3.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	node, err = dag.DecodeProtobuf(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	link, err = node.GetNodeLink("bear")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	if link.Cid != rnd3.Cid() {
 		t.Errorf("Incorrect link in ProtoNode pnd3 / bear")
 	}
 
 	link, err = node.GetNodeLink("second")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	if link.Cid != pnd2.Cid() {
 		t.Errorf("Incorrect link in ProtoNode pnd3 / second")
 	}
@@ -361,66 +309,36 @@ func verifyCborNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 
 	// cnd1
 	data, err = ds.GetCid(cnd1.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	cnd1A := cborTest{}
 	err = cbor.DecodeInto(data, &cnd1A)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if cnd1A.Str != "foo" {
-		t.Fatal("cnd1 did not decode properly (str)")
-	}
-	if cnd1A.I != 100 {
-		t.Fatal("cnd1 did not decode properly (i)")
-	}
-	if cnd1A.B {
-		t.Fatal("cnd1 did not decode properly (B)")
-	}
+	assert.Equal(t, "foo", cnd1A.S, "cnd1 did not decode properly (str)")
+	assert.Equal(t, 100, cnd1A.I, "cnd1 did not decode properly (i)")
+	assert.Equal(t, false, cnd1A.B, "cnd1 did not decode properly (b)")
 
 	if !modified {
 		// cnd2
 		data, err = ds.GetCid(cnd2.Cid())
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		cnd2A := cborTest{}
 		err = cbor.DecodeInto(data, &cnd2A)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
-		if cnd2A.Str != "bar" {
-			t.Fatal("cnd2 did not decode properly (str)")
-		}
-		if cnd2A.I != -100 {
-			t.Fatal("cnd2 did not decode properly (i)")
-		}
-		if cnd2A.B {
-			t.Fatal("cnd2 did not decode properly (B)")
-		}
+		assert.Equal(t, "bar", cnd2A.S, "cnd2 did not decode properly (str)")
+		assert.Equal(t, -100, cnd2A.I, "cnd2 did not decode properly (i)")
+		assert.Equal(t, false, cnd2A.B, "cnd2 did not decode properly (b)")
 	}
 
 	// cnd3
 	data, err = ds.GetCid(cnd3.Cid())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	cnd3A := cborTest{}
 	err = cbor.DecodeInto(data, &cnd3A)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if cnd3A.Str != "baz" {
-		t.Fatal("cnd3 did not decode properly (str)")
-	}
-	if cnd3A.I != 0 {
-		t.Fatal("cnd3 did not decode properly (i)")
-	}
-	if !cnd3A.B {
-		t.Fatal("cnd3 did not decode properly (B)")
-	}
+	assert.Equal(t, "baz", cnd3A.S, "cnd3 did not decode properly (str)")
+	assert.Equal(t, 0, cnd3A.I, "cnd3 did not decode properly (i)")
+	assert.Equal(t, true, cnd3A.B, "cnd3 did not decode properly (b)")
 }
