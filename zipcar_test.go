@@ -88,11 +88,14 @@ func TestBuildNew(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	ds.SetComment(cnd3.Cid().String())
+
 	// we are verifying from cache in this case
 	verifyHasEntries(t, ds, false)
 	verifyRawNodes(t, ds, false)
 	verifyProtoNodes(t, ds, false)
 	verifyCborNodes(t, ds, false)
+	verifyComment(t, ds, false)
 }
 
 func TestReadExisting(t *testing.T) {
@@ -112,6 +115,7 @@ func TestReadExisting(t *testing.T) {
 	verifyRawNodes(t, ds, false)
 	verifyProtoNodes(t, ds, false)
 	verifyCborNodes(t, ds, false)
+	verifyComment(t, ds, false)
 }
 
 func TestModifyExisting(t *testing.T) {
@@ -131,6 +135,7 @@ func TestModifyExisting(t *testing.T) {
 	verifyRawNodes(t, ds, false)
 	verifyProtoNodes(t, ds, false)
 	verifyCborNodes(t, ds, false)
+	verifyComment(t, ds, false)
 
 	err = ds.PutCid(rndz.Cid(), rndz.RawData())
 	assert.NoError(t, err)
@@ -140,13 +145,13 @@ func TestModifyExisting(t *testing.T) {
 	assert.NoError(t, err)
 	err = ds.DeleteCid(cnd2.Cid())
 	assert.NoError(t, err)
+	ds.SetComment(cnd2.Cid().String())
 
 	verifyHasEntries(t, ds, true)
 	verifyRawNodes(t, ds, true)
 	verifyProtoNodes(t, ds, true)
 	verifyCborNodes(t, ds, true)
-
-	verifyHas(t, ds, rnd1.Cid(), "rnd1")
+	verifyComment(t, ds, true)
 }
 
 func TestReadModified(t *testing.T) {
@@ -166,6 +171,7 @@ func TestReadModified(t *testing.T) {
 	verifyRawNodes(t, ds, true)
 	verifyProtoNodes(t, ds, true)
 	verifyCborNodes(t, ds, true)
+	verifyComment(t, ds, true)
 	verifyHas(t, ds, rnd1.Cid(), "rnd1")
 }
 
@@ -186,6 +192,7 @@ func TestReadJS(t *testing.T) {
 	verifyRawNodes(t, ds, false)
 	verifyProtoNodes(t, ds, false)
 	verifyCborNodes(t, ds, false)
+	verifyComment(t, ds, false)
 }
 
 func TestTeardown(t *testing.T) {
@@ -232,8 +239,11 @@ func verifyHasEntries(t *testing.T, ds *ZipDatastore, modified bool) {
 }
 
 func verifyRawNodes(t *testing.T, ds *ZipDatastore, modified bool) {
-	for i, raw := range []*dag.RawNode{rnd1, rnd2, rnd3} {
+	for i, raw := range []*dag.RawNode{rnd1, rnd2, rnd3, rndz} {
 		if modified && i == 1 {
+			continue
+		}
+		if !modified && i == 3 {
 			continue
 		}
 		data, err := ds.GetCid(raw.Cid())
@@ -341,4 +351,16 @@ func verifyCborNodes(t *testing.T, ds *ZipDatastore, modified bool) {
 	assert.Equal(t, "baz", cnd3A.S, "cnd3 did not decode properly (str)")
 	assert.Equal(t, 0, cnd3A.I, "cnd3 did not decode properly (i)")
 	assert.Equal(t, true, cnd3A.B, "cnd3 did not decode properly (b)")
+}
+
+func verifyComment(t *testing.T, ds *ZipDatastore, modified bool) {
+	var expected string
+
+	if modified {
+		expected = cnd2.String()
+	} else {
+		expected = cnd3.String()
+	}
+
+	assert.Equal(t, ds.Comment(), expected, "Unexpected archive comment")
 }

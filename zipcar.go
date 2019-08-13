@@ -46,6 +46,7 @@ type ZipDatastore struct {
 	index    map[string]*zip.File
 	cache    map[string][]byte
 	file     *os.File
+	comment  string
 	modified bool
 }
 
@@ -173,6 +174,18 @@ func (zipDs *ZipDatastore) GetSize(key ds.Key) (int, error) {
 	return int(f.FileInfo().Size()), nil
 }
 
+// Comment retrieves the archive comment, if one was set
+func (zipDs *ZipDatastore) Comment() string {
+	return zipDs.comment
+}
+
+// SetComment sets the archive comment. As a mutation operation, calling this method
+// one or more times will trigger a full rewrite of the ZIP archive upon Close().
+func (zipDs *ZipDatastore) SetComment(comment string) {
+	zipDs.comment = comment
+	zipDs.modified = true
+}
+
 // Query is not implemented, it will always return an error when called
 func (zipDs *ZipDatastore) Query(q dsq.Query) (dsq.Results, error) {
 	return nil, ErrUnimplemented
@@ -240,6 +253,8 @@ func (zipDs *ZipDatastore) Close() (err error) {
 		}
 	}
 
+	writer.SetComment(zipDs.comment)
+
 	return err
 }
 
@@ -296,6 +311,8 @@ func NewDatastore(path string) (*ZipDatastore, error) {
 		for _, f := range reader.File {
 			zipDs.index[f.Name] = f
 		}
+
+		zipDs.comment = reader.Comment
 	}
 
 	return &zipDs, nil
